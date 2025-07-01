@@ -7,6 +7,13 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
 const sessions = {};
+const produtos = {
+  1: "🎱 Mesa de Bilhar Tradicional – 2,23 x 1,23m, acabamento em verniz, campo de ardósia. Preço: R$ 2.798",
+  2: "⚽ Mesa de Pebolim Profissional – Estrutura reforçada, pintura automotiva. Preço: R$ 1.350",
+  3: "🔴 Conjunto de Bolas Snooker – 16 bolas oficiais, resina importada. Preço: R$ 190",
+  4: "🪵 Taco Profissional Madeira – Ponta rosqueável, cabo emborrachado. Preço: R$ 120",
+  5: "🧥 Capa para Mesa de Bilhar – Tecido resistente, várias cores. Preço: R$ 99"
+};
 
 app.post('/webhook', async (req, res) => {
   const msg = req.body.Body?.trim();
@@ -30,7 +37,7 @@ app.post('/webhook', async (req, res) => {
 
   switch (step) {
     case 0:
-      reply("Olá! Bem-vindo ao atendimento.\nEscolha uma opção:\n1️⃣ Fazer pedido\n2️⃣ Saber mais");
+      reply("👋 Olá! Bem-vindo ao atendimento da *Castillero Diversões*.\n\nEscolha uma opção:\n\n1️⃣ Fazer pedido\n2️⃣ Ver produtos\n3️⃣ Sobre nós");
       session.step = 1;
       break;
 
@@ -39,16 +46,35 @@ app.post('/webhook', async (req, res) => {
         session.step = 2;
         reply("👤 Nome completo do cliente:");
       } else if (msg === '2') {
-        reply("🎯 Somos fabricantes de mesas de sinuca, pebolim, ping pong e acessórios.\nDigite 1 para fazer pedido.");
+        let lista = "🛒 *Produtos Castillero Diversões:*\n";
+        for (const [num, desc] of Object.entries(produtos)) {
+          lista += `${num}️⃣ ${desc.split("–")[0].trim()}\n`;
+        }
+        lista += "\nDigite o número para ver mais detalhes ou *0* para voltar.";
+        session.step = 20;
+        reply(lista);
+      } else if (msg === '3') {
+        reply("🏆 *Sobre nós*\n\nA Castillero Diversões atua há mais de 20 anos na fabricação de mesas de bilhar, pebolim, ping pong e acessórios. Referência em qualidade e atendimento, oferece produtos sob medida para residências e estabelecimentos.\n\nDigite *1* para fazer pedido ou *2* para ver produtos.");
       } else {
-        reply("❌ Opção inválida. Digite 1 ou 2.");
+        reply("❌ Opção inválida. Digite 1, 2 ou 3.");
+      }
+      break;
+
+    case 20:
+      if (msg === '0') {
+        session.step = 0;
+        reply("🔙 Retornando ao menu...");
+      } else if (produtos[msg]) {
+        reply(produtos[msg] + "\n\nDigite *1* para fazer pedido ou *0* para voltar ao menu.");
+      } else {
+        reply("❌ Produto não encontrado. Digite um número da lista ou *0* para voltar.");
       }
       break;
 
     case 2:
       data.nome = msg;
       session.step = 3;
-      reply("🔢 CPF ou CNPJ:");
+      reply("🪪 CPF ou CNPJ:");
       break;
 
     case 3:
@@ -66,7 +92,7 @@ app.post('/webhook', async (req, res) => {
     case 5:
       data.quantidade = msg;
       session.step = 6;
-      reply("🎁 Há algum brinde incluso? (se não, diga 'Nenhum')");
+      reply("🎁 Brindes inclusos? (se não, diga 'Nenhum')");
       break;
 
     case 6:
@@ -122,31 +148,49 @@ app.post('/webhook', async (req, res) => {
       session.step = 15;
 
       const resumo = `
-✅ Pedido concluído:
-👤 Nome: ${data.nome}
-🪪 CPF/CNPJ: ${data.cpf}
-📦 Produto: ${data.produto}
-🔢 Quantidade: ${data.quantidade}
-🎁 Brinde: ${data.brinde}
-🧩 Acessórios: ${data.acessorios}
-📝 Obs: ${data.observacoes}
-📍 Endereço: ${data.rua}, ${data.numero} - ${data.bairro}, ${data.cidade} - ${data.estado}, ${data.cep}
-📱 Tel: ${phone}
+✅ *Pedido registrado com sucesso!*
+
+👤 *Nome:* ${data.nome}
+🪪 *CPF/CNPJ:* ${data.cpf}
+📦 *Produto:* ${data.produto}
+🔢 *Qtd:* ${data.quantidade}
+🎁 *Brinde:* ${data.brinde}
+🧩 *Acessórios:* ${data.acessorios}
+📝 *Obs:* ${data.observacoes}
+📍 *Endereço:* ${data.rua}, ${data.numero} - ${data.bairro}, ${data.cidade} - ${data.estado}, ${data.cep}
+📱 *Telefone:* ${phone}
       `.trim();
 
-      reply(resumo + "\n\n🚚 O proprietário entrará em contato para calcular o frete. Obrigado!");
+      reply(resumo + "\n\n🚚 O proprietário entrará em contato para calcular o frete.\n\nSe quiser fazer outro pedido, digite *1*.");
 
       try {
+        // Envia para planilha
         await axios.post("https://api.sheetbest.com/sheets/768a0c04-5ae6-47b7-9f6d-d1dea72ea14b", {
           ...data,
           telefone: phone,
           datahora: new Date().toLocaleString("pt-BR")
         });
+
+        // Envia notificação para proprietário
+        await axios.post(
+          'https://api.twilio.com/2010-04-01/Accounts/AC80c2a72e76b46c4433264f07f3c7a994/Messages.json',
+          new URLSearchParams({
+            To: 'whatsapp:+5511987891091',
+            From: 'whatsapp:+14155238886',
+            Body: `📬 Novo pedido recebido:\n\n${resumo}`
+          }),
+          {
+            auth: {
+              username: 'AC80c2a72e76b46c4433264f07f3c7a994',
+              password: '30b6e104a9e82551efcc0c2360c9b8af'
+            }
+          }
+        );
+
       } catch (error) {
-        console.error("❌ Erro ao enviar dados para o Google Sheets:", error.message);
+        console.error("❌ Erro ao enviar:", error.response?.data || error.message);
       }
 
-      // encerra a sessão
       delete sessions[phone];
       break;
 
@@ -156,7 +200,6 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-// Porta dinâmica para Railway
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("✅ Bot rodando na porta " + PORT);
