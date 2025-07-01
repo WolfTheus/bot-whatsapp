@@ -137,7 +137,7 @@ app.post('/webhook', async (req, res) => {
       reply(resumo + "\n\n🚚 O proprietário entrará em contato para calcular o frete. Obrigado!");
 
       try {
-        await axios.post("https://script.google.com/macros/s/AKfycbzADoRkMrVPOBk90OFweQNvSRCSZrLYarfj9s8layaM2tc6lU2tpUQDEZfd_9BoBtpm/exec", {
+        await axios.post("https://api.sheetbest.com/sheets/768a0c04-5ae6-47b7-9f6d-d1dea72ea14b", {
           ...data,
           telefone: phone,
           datahora: new Date().toLocaleString("pt-BR")
