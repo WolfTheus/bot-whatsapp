@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const { MessagingResponse } = require('twilio').twiml;
@@ -164,8 +166,8 @@ app.post('/webhook', async (req, res) => {
       reply(resumo + "\n\n🚚 O proprietário entrará em contato para calcular o frete.\n\nSe quiser fazer outro pedido, digite *1*.");
 
       try {
-        // Envia para planilha
-        await axios.post("https://api.sheetbest.com/sheets/768a0c04-5ae6-47b7-9f6d-d1dea72ea14b", {
+        // Envia para planilha Sheetbest
+        await axios.post(process.env.SHEETBEST_WEBHOOK, {
           ...data,
           telefone: phone,
           datahora: new Date().toLocaleString("pt-BR")
@@ -173,16 +175,16 @@ app.post('/webhook', async (req, res) => {
 
         // Envia notificação para proprietário
         await axios.post(
-          'https://api.twilio.com/2010-04-01/Accounts/AC80c2a72e76b46c4433264f07f3c7a994/Messages.json',
+          `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
           new URLSearchParams({
-            To: 'whatsapp:+5511987891091',
-            From: 'whatsapp:+14155238886',
+            To: process.env.PROPRIETARIO_WHATSAPP,
+            From: process.env.TWILIO_FROM,
             Body: `📬 Novo pedido recebido:\n\n${resumo}`
           }),
           {
             auth: {
-              username: 'AC80c2a72e76b46c4433264f07f3c7a994',
-              password: '30b6e104a9e82551efcc0c2360c9b8af'
+              username: process.env.TWILIO_SID,
+              password: process.env.TWILIO_TOKEN
             }
           }
         );
